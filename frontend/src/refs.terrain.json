@@ -1,0 +1,10 @@
+{
+  "testnet": {
+    "nftmx_dvc": {
+      "codeId": "62056",
+      "contractAddresses": {
+        "default": "terra1pxx3g3f32xl5gegzwxwgxpy3n8juz5f8mudjyv"
+      }
+    }
+  }
+}
