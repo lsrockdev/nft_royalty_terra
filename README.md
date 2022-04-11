@@ -1,4 +1,4 @@
-# NFTMX DVC MarketPlace
+# NFTMX Multi Level Royalty 
 
 ## Deploy to TestNet
 ```
