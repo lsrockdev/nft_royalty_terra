@@ -153,6 +153,15 @@ pub struct MintMsgExtension {
     pub price: Uint128
 }
 
+pub struct PackableTokenExtension {
+    pub name: String,
+    pub minted_by: Addr,
+    pub current_owner: Addr,
+    pub previous_owner: Option<Addr>,
+    pub price: Uint128,
+    pub number_of_transfers: Uint128,
+    pub for_sale: bool
+}
 
 pub const CONFIG: Item<Config> = Item::new("config");
 
