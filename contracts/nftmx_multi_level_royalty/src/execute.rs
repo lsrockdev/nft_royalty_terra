@@ -8,7 +8,8 @@ use cw721::{ContractInfoResponse, CustomMsg, Cw721Execute, Cw721ReceiveMsg, Expi
 
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MintMsg};
-use crate::state::{Approval, Cw721Contract, TokenInfo, Config, CONFIG, PackableTokenExtension, MintMsgExtension};
+use crate::state::{Approval, Cw721Contract, TokenInfo, Config, CONFIG, ALLPACKABLENFTS, PackableToken };
+use cw_storage_plus::{Index, IndexList, IndexedMap, Item, Map, MultiIndex};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw721-base";
@@ -93,7 +94,7 @@ where
         deps: DepsMut,
         _env: Env,
         info: MessageInfo,
-        msg: MintMsg::<MintMsgExtension>,
+        msg: MintMsg<T>,
     ) -> Result<Response<C>, ContractError> {
         let minter = self.minter.load(deps.storage)?;
 
@@ -105,24 +106,38 @@ where
         let token = TokenInfo {
             owner: deps.api.addr_validate(&msg.owner)?,
             approvals: vec![],
-            token_uri: msg.token_uri,
-            extension: PackableTokenExtension {
-                name: msg.extension.name,
-                minted_by: info.sender,
-                current_owner: info.sender,
-                previous_owner: None,
-                price: msg.extension.price,
-                number_of_transfers: Uint128::zero(),
-                for_sale: true
-            }
+            token_uri: msg.token_uri.clone(),
+            extension: msg.extension.clone()
+            // extension: msg.extension,
         };
+        self.increment_tokens(deps.storage)?;
+
+        let count = self.token_count(deps.storage)?;
+        let token_id = count.to_string();
         self.tokens
-            .update(deps.storage, &msg.token_id, |old| match old {
+            .update(deps.storage, &token_id.clone(), |old| match old {
                 Some(_) => Err(ContractError::Claimed {}),
                 None => Ok(token),
             })?;
 
-        self.increment_tokens(deps.storage)?;
+
+
+        let packable_token = PackableToken {
+            token_id: token_id.clone(),
+            token_name: msg.name.clone(),
+            token_uri: msg.token_uri.clone(),
+            minted_by: info.sender.clone(),
+            current_owner: info.sender.clone(),
+            previous_owner: None,
+            price: msg.price.clone(),
+            number_of_transfers: Uint128::zero(),
+            for_sale: true
+        };
+        ALLPACKABLENFTS
+            .update(deps.storage, &token_id.clone(), |old| match old {
+                Some(_) => Err(ContractError::Claimed {}),
+                None => Ok(packable_token),
+            })?;
 
         Ok(Response::new()
             .add_attribute("action", "mint")

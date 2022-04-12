@@ -6,7 +6,7 @@ use std::marker::PhantomData;
 use cosmwasm_std::{Addr, BlockInfo, StdResult, Storage, Decimal, Uint128};
 
 use cw721::{ContractInfoResponse, CustomMsg, Cw721, Expiration};
-use cw_storage_plus::{Index, IndexList, IndexedMap, Item, Map, MultiIndex};
+use cw_storage_plus::{Index, IndexList, IndexedMap, Item, Map, MultiIndex };
 
 pub struct Cw721Contract<'a, T, C>
 where
@@ -148,13 +148,11 @@ pub fn token_owner_idx<T>(d: &TokenInfo<T>) -> Addr {
     d.owner.clone()
 }
 
-pub struct MintMsgExtension {
-    pub name: String,
-    pub price: Uint128
-}
-
-pub struct PackableTokenExtension {
-    pub name: String,
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+pub struct PackableToken {
+    pub token_id: String,
+    pub token_name: String,
+    pub token_uri: Option<String>,
     pub minted_by: Addr,
     pub current_owner: Addr,
     pub previous_owner: Option<Addr>,
@@ -165,3 +163,6 @@ pub struct PackableTokenExtension {
 
 pub const CONFIG: Item<Config> = Item::new("config");
 
+pub const ALLPACKABLENFTS: Map<&str, PackableToken> = Map::new("app_packable_nfts");
+pub const TOKENURIEXISTS: Map<&str, bool> = Map::new("token_uri_exists");
+pub const TOKENNAMEEXISTS: Map<&str, bool> = Map::new("token_name_exists");

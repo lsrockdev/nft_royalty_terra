@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::Binary;
+use cosmwasm_std::{ Binary, Uint128 };
 use cw721::Expiration;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -69,6 +69,9 @@ pub struct MintMsg<T> {
     pub token_uri: Option<String>,
     /// Any custom extension used by this contract
     pub extension: T,
+    
+    pub name: String,
+    pub price: Uint128
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
