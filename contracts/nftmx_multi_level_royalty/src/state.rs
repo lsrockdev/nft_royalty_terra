@@ -3,7 +3,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 
-use cosmwasm_std::{Addr, BlockInfo, StdResult, Storage};
+use cosmwasm_std::{Addr, BlockInfo, StdResult, Storage, Decimal};
 
 use cw721::{ContractInfoResponse, CustomMsg, Cw721, Expiration};
 use cw_storage_plus::{Index, IndexList, IndexedMap, Item, Map, MultiIndex};
@@ -18,7 +18,6 @@ where
     /// Stored as (granter, operator) giving operator full control over granter's account
     pub operators: Map<'a, (&'a Addr, &'a Addr), Expiration>,
     pub tokens: IndexedMap<'a, &'a str, TokenInfo<T>, TokenIndexes<'a, T>>,
-
     pub(crate) _custom_response: PhantomData<C>,
 }
 
@@ -89,6 +88,16 @@ where
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct Config {
+    pub collection_name: String,
+    pub collection_name_symbol: String,
+    pub max_packable_nft: u64,
+    pub max_pack_item_count: u64,
+    pub max_royalyty_owner: u64,
+    pub buy_sell_fee: Decimal,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct TokenInfo<T> {
     /// The owner of the newly minted NFT
     pub owner: Addr,
@@ -138,3 +147,6 @@ where
 pub fn token_owner_idx<T>(d: &TokenInfo<T>) -> Addr {
     d.owner.clone()
 }
+
+pub const CONFIG: Item<Config> = Item::new("config");
+

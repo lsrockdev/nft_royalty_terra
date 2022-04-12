@@ -1,14 +1,14 @@
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use cosmwasm_std::{Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
+use cosmwasm_std::{Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Decimal};
 
 use cw2::set_contract_version;
 use cw721::{ContractInfoResponse, CustomMsg, Cw721Execute, Cw721ReceiveMsg, Expiration};
 
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MintMsg};
-use crate::state::{Approval, Cw721Contract, TokenInfo};
+use crate::state::{Approval, Cw721Contract, TokenInfo, Config, CONFIG};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw721-base";
@@ -29,12 +29,21 @@ where
         set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
         let info = ContractInfoResponse {
-            name: msg.name,
-            symbol: msg.symbol,
+            name: msg.name.clone(),
+            symbol: msg.symbol.clone(),
         };
         self.contract_info.save(deps.storage, &info)?;
         let minter = deps.api.addr_validate(&msg.minter)?;
         self.minter.save(deps.storage, &minter)?;
+        let con = Config {
+            collection_name: msg.name,
+            collection_name_symbol: msg.symbol,
+            max_packable_nft: 5000u64,
+            max_pack_item_count: 10u64,
+            max_royalyty_owner: 10u64,
+            buy_sell_fee: Decimal::one()
+        };
+        CONFIG.save(deps.storage, &con)?;    
         Ok(Response::default())
     }
 
@@ -111,6 +120,20 @@ where
             .add_attribute("action", "mint")
             .add_attribute("minter", info.sender)
             .add_attribute("token_id", msg.token_id))
+    }
+
+    pub fn mint_packable(
+        &self,
+        deps: DepsMut,
+        _env: Env,
+        info: MessageInfo,
+        msg: MintMsg<T>,
+    ) -> Result<Response<C>, ContractError> {
+        Ok(Response::new()
+            .add_attribute("action", "mint")
+            .add_attribute("minter", info.sender)
+            .add_attribute("token_id", msg.token_id)
+        )
     }
 }
 
