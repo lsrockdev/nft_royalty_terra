@@ -51,7 +51,7 @@ pub enum ExecuteMsg<T> {
     RevokeAll { operator: String },
 
     /// Mint a new NFT, can only be called by the contract minter
-    Mint(MintMsg<T>),
+    MintPackable(MintMsg<T>),
 
     /// Burn an NFT the sender has access to
     Burn { token_id: String },

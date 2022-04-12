@@ -1,14 +1,14 @@
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use cosmwasm_std::{Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Decimal};
+use cosmwasm_std::{Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Decimal, Uint128};
 
 use cw2::set_contract_version;
 use cw721::{ContractInfoResponse, CustomMsg, Cw721Execute, Cw721ReceiveMsg, Expiration};
 
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MintMsg};
-use crate::state::{Approval, Cw721Contract, TokenInfo, Config, CONFIG};
+use crate::state::{Approval, Cw721Contract, TokenInfo, Config, CONFIG, PackableTokenExtension, MintMsgExtension};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw721-base";
@@ -55,7 +55,7 @@ where
         msg: ExecuteMsg<T>,
     ) -> Result<Response<C>, ContractError> {
         match msg {
-            ExecuteMsg::Mint(msg) => self.mint(deps, env, info, msg),
+            ExecuteMsg::MintPackable(msg) => self.mint_packable(deps, env, info, msg),
             ExecuteMsg::Approve {
                 spender,
                 token_id,
@@ -88,12 +88,12 @@ where
     T: Serialize + DeserializeOwned + Clone,
     C: CustomMsg,
 {
-    pub fn mint(
+    pub fn mint_packable(
         &self,
         deps: DepsMut,
         _env: Env,
         info: MessageInfo,
-        msg: MintMsg<T>,
+        msg: MintMsg::<MintMsgExtension>,
     ) -> Result<Response<C>, ContractError> {
         let minter = self.minter.load(deps.storage)?;
 
@@ -106,7 +106,15 @@ where
             owner: deps.api.addr_validate(&msg.owner)?,
             approvals: vec![],
             token_uri: msg.token_uri,
-            extension: msg.extension,
+            extension: PackableTokenExtension {
+                name: msg.extension.name,
+                minted_by: info.sender,
+                current_owner: info.sender,
+                previous_owner: None,
+                price: msg.extension.price,
+                number_of_transfers: Uint128::zero(),
+                for_sale: true
+            }
         };
         self.tokens
             .update(deps.storage, &msg.token_id, |old| match old {
@@ -120,20 +128,6 @@ where
             .add_attribute("action", "mint")
             .add_attribute("minter", info.sender)
             .add_attribute("token_id", msg.token_id))
-    }
-
-    pub fn mint_packable(
-        &self,
-        deps: DepsMut,
-        _env: Env,
-        info: MessageInfo,
-        msg: MintMsg<T>,
-    ) -> Result<Response<C>, ContractError> {
-        Ok(Response::new()
-            .add_attribute("action", "mint")
-            .add_attribute("minter", info.sender)
-            .add_attribute("token_id", msg.token_id)
-        )
     }
 }
 

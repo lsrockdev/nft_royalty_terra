@@ -3,7 +3,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 
-use cosmwasm_std::{Addr, BlockInfo, StdResult, Storage, Decimal};
+use cosmwasm_std::{Addr, BlockInfo, StdResult, Storage, Decimal, Uint128};
 
 use cw721::{ContractInfoResponse, CustomMsg, Cw721, Expiration};
 use cw_storage_plus::{Index, IndexList, IndexedMap, Item, Map, MultiIndex};
@@ -147,6 +147,12 @@ where
 pub fn token_owner_idx<T>(d: &TokenInfo<T>) -> Addr {
     d.owner.clone()
 }
+
+pub struct MintMsgExtension {
+    pub name: String,
+    pub price: Uint128
+}
+
 
 pub const CONFIG: Item<Config> = Item::new("config");
 
