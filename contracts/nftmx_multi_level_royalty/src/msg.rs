@@ -54,7 +54,7 @@ pub enum ExecuteMsg<T> {
     MintPackable(MintMsg<T>),
 
     /// Burn an NFT the sender has access to
-    Burn { token_id: String },
+    BurnPackable { token_id: String },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

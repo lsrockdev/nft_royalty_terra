@@ -78,7 +78,7 @@ where
                 token_id,
                 msg,
             } => self.send_nft(deps, env, info, contract, token_id, msg),
-            ExecuteMsg::Burn { token_id } => self.burn(deps, env, info, token_id),
+            ExecuteMsg::BurnPackable { token_id } => self.burn_packable(deps, env, info, token_id),
         }
     }
 }
@@ -117,18 +117,15 @@ where
             extension: msg.extension.clone()
             // extension: msg.extension,
         };
-        self.increment_tokens(deps.storage)?;
-
-        let count = self.token_count(deps.storage)?;
-        let token_id = count.to_string();
         self.tokens
-            .update(deps.storage, &token_id.clone(), |old| match old {
+            .update(deps.storage, &msg.token_id.clone(), |old| match old {
                 Some(_) => Err(ContractError::Claimed {}),
                 None => Ok(token),
             })?;
+        self.increment_tokens(deps.storage)?;
 
         let packable_token = PackableToken {
-            token_id: token_id.clone(),
+            token_id: msg.token_id.clone(),
             token_name: msg.name.clone(),
             token_uri: msg.token_uri.clone(),
             minted_by: info.sender.clone(),
@@ -139,7 +136,7 @@ where
             for_sale: true
         };
         ALLPACKABLENFTS
-            .update(deps.storage, &token_id.clone(), |old| match old {
+            .update(deps.storage, &msg.token_id.clone(), |old| match old {
                 Some(_) => Err(ContractError::Claimed {}),
                 None => Ok(packable_token),
             })?;
@@ -154,6 +151,32 @@ where
             .add_attribute("minter", info.sender)
             .add_attribute("token_id", msg.token_id))
     }
+
+    pub fn burn_packable(
+        &self,
+        deps: DepsMut,
+        env: Env,
+        info: MessageInfo,
+        token_id: String,
+    ) -> Result<Response<C>, ContractError> {
+        let token = self.tokens.load(deps.storage, &token_id)?;        
+        self.check_can_send(deps.as_ref(), &env, &info, &token)?;
+        self.tokens.remove(deps.storage, &token_id)?;
+
+        // burn packable
+        let packable_token = ALLPACKABLENFTS.load(deps.storage, &token_id)?;        
+        TOKENURIEXISTS.remove(deps.storage, &packable_token.token_uri);
+        TOKENNAMEEXISTS.remove(deps.storage, &packable_token.token_name);
+        ALLPACKABLENFTS.remove(deps.storage, &token_id);
+
+        self.decrement_tokens(deps.storage)?;
+
+        Ok(Response::new()
+            .add_attribute("action", "burn_packable")
+            .add_attribute("sender", info.sender)
+            .add_attribute("token_id", token_id))
+    }
+
 }
 
 impl<'a, T, C> Cw721Execute<T, C> for Cw721Contract<'a, T, C>
