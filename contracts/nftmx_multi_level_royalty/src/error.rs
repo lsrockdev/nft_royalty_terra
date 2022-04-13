@@ -30,4 +30,17 @@ pub enum ContractError {
     #[error("not nft owner")]
     NotNftOwner {},
 
+    #[error("NFT pack balance is not enough")]
+    NoNftBalance {},
+
+    #[error("Only pack's owner can unpack the items")]
+    InvalidOwner {},
+
+    #[error("Unable to unpack with existing royalty")]
+    NoNftPackRoyalty {},
+
+    #[error("NFT item in pack should be this contract")]
+    InvalidNftOwner {},
+
+
 }

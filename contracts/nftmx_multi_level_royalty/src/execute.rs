@@ -257,6 +257,56 @@ where
             .add_attribute("pack_name", pack_name)
         )
     }
+
+    pub fn unpack_nfts(
+        &self,
+        deps: DepsMut,
+        env: Env,
+        info: MessageInfo,
+        pack_id: u64
+    ) -> Result<Response<C>, ContractError> {
+        let nft_pack_balances = NFTPACKBALANCES.load(deps.storage, &info.sender.to_string())?;
+        if nft_pack_balances < 1u64 {
+            return Err(ContractError::NoNftBalance {});
+        }
+        let nft_pack_owner = NFTPACKOWNERS.load(deps.storage, &info.sender.to_string())?;
+        if nft_pack_owner != info.sender {
+            return Err(ContractError::NoNftBalance {});
+        }
+        let nft_pack = ALLNFTPACKS.load(deps.storage, &pack_id.to_string())?;
+        if nft_pack.current_owner != info.sender {
+            return Err(ContractError::NoNftBalance {});
+        }
+        let empty = ROYALTYFEES.may_load(deps.storage, (&pack_id.to_string(), &info.sender.clone().to_string()))?;
+        if empty == None {
+            return Err(ContractError::NoNftPackRoyalty {});
+        }
+        for pack_item in nft_pack.pack_items.clone() {
+            //TODO check nft token owner
+            let mut token = self.tokens.load(deps.storage, &pack_item)?;
+            if token.owner != env.contract.address {
+                return Err(ContractError::InvalidNftOwner {});
+            }
+            //transfter token to sender
+            token.owner = info.sender.clone();
+            token.approvals = vec![];
+            self.tokens.save(deps.storage, &pack_item, &token)?;
+        }
+        PACKNAMEEXISTS.update(deps.storage, &nft_pack.pack_name, |_| -> StdResult<_> {
+            Ok(false)
+        })?;
+        NFTPACKBALANCES.update(deps.storage, &nft_pack.pack_id.clone().to_string(), |old| -> StdResult<_> {
+            match old {
+                Some(v) => Ok(v - 1),
+                None => Ok(0u64),
+            }
+        })?;
+        ALLNFTPACKS.remove(deps.storage, &pack_id.to_string());
+        NFTPACKOWNERS.remove(deps.storage, &info.sender.to_string());
+        Ok(Response::new()
+            .add_attribute("action", "unpack_nfts")
+        )
+    }
 }
 
 impl<'a, T, C> Cw721Execute<T, C> for Cw721Contract<'a, T, C>
