@@ -8,7 +8,7 @@ use cw721::{ContractInfoResponse, CustomMsg, Cw721Execute, Cw721ReceiveMsg, Expi
 
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MintMsg};
-use crate::state::{Approval, Cw721Contract, TokenInfo, Config, CONFIG, ALLPACKABLENFTS, PackableToken };
+use crate::state::{Approval, Cw721Contract, TokenInfo, Config, CONFIG, ALLPACKABLENFTS, PackableToken, TOKENURIEXISTS, TOKENNAMEEXISTS };
 use cw_storage_plus::{Index, IndexList, IndexedMap, Item, Map, MultiIndex};
 
 // version info for migration info
@@ -97,9 +97,16 @@ where
         msg: MintMsg<T>,
     ) -> Result<Response<C>, ContractError> {
         let minter = self.minter.load(deps.storage)?;
-
         if info.sender != minter {
             return Err(ContractError::Unauthorized {});
+        }
+        let token_uri_exist = TOKENURIEXISTS.load(deps.storage, &msg.token_uri)?;
+        if token_uri_exist {
+            return Err(ContractError::ExistTokenUri {});
+        }
+        let token_name_exist = TOKENNAMEEXISTS.load(deps.storage, &msg.name)?;
+        if token_name_exist {
+            return Err(ContractError::ExistTokenName {});
         }
 
         // create the token
@@ -120,8 +127,6 @@ where
                 None => Ok(token),
             })?;
 
-
-
         let packable_token = PackableToken {
             token_id: token_id.clone(),
             token_name: msg.name.clone(),
@@ -138,7 +143,12 @@ where
                 Some(_) => Err(ContractError::Claimed {}),
                 None => Ok(packable_token),
             })?;
-
+        TOKENURIEXISTS.update(deps.storage, &msg.token_uri, |_| -> StdResult<_> {
+            Ok(true)
+        })?;
+        TOKENNAMEEXISTS.update(deps.storage, &msg.name, |_| -> StdResult<_> {
+            Ok(true)
+        })?;
         Ok(Response::new()
             .add_attribute("action", "mint")
             .add_attribute("minter", info.sender)

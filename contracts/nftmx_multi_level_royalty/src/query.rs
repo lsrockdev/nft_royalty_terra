@@ -34,7 +34,7 @@ where
     fn nft_info(&self, deps: Deps, token_id: String) -> StdResult<NftInfoResponse<T>> {
         let info = self.tokens.load(deps.storage, &token_id)?;
         Ok(NftInfoResponse {
-            token_uri: info.token_uri,
+            token_uri: Some(info.token_uri),
             extension: info.extension,
         })
     }
@@ -199,7 +199,7 @@ where
                 approvals: humanize_approvals(&env.block, &info, include_expired),
             },
             info: NftInfoResponse {
-                token_uri: info.token_uri,
+                token_uri: Some(info.token_uri),
                 extension: info.extension,
             },
         })

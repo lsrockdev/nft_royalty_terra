@@ -17,4 +17,10 @@ pub enum ContractError {
 
     #[error("Approval not found for: {spender}")]
     ApprovalNotFound { spender: String },
+
+    #[error("already exist token uri")]
+    ExistTokenUri {},
+
+    #[error("already exist token name")]
+    ExistTokenName {},
 }

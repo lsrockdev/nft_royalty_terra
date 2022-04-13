@@ -107,7 +107,7 @@ pub struct TokenInfo<T> {
     /// Universal resource identifier for this NFT
     /// Should point to a JSON file that conforms to the ERC721
     /// Metadata JSON Schema
-    pub token_uri: Option<String>,
+    pub token_uri: String,
 
     /// You can add any custom metadata here when you extend cw721-base
     pub extension: T,
@@ -152,7 +152,7 @@ pub fn token_owner_idx<T>(d: &TokenInfo<T>) -> Addr {
 pub struct PackableToken {
     pub token_id: String,
     pub token_name: String,
-    pub token_uri: Option<String>,
+    pub token_uri: String,
     pub minted_by: Addr,
     pub current_owner: Addr,
     pub previous_owner: Option<Addr>,
