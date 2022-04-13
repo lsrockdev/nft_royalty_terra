@@ -175,7 +175,8 @@ pub struct NftPack {
     pub previous_price: Uint128,
     pub number_of_transfers: u64,
     pub for_sale: bool,
-    pub royalty_owners: Vec<Addr>
+    pub royalty_owners: Vec<Addr>,
+    pub approvals: Vec<Addr>
 }
 
 pub const CONFIG: Item<Config> = Item::new("config");
@@ -189,5 +190,4 @@ pub const PACKNAMEEXISTS: Map<&str, bool> = Map::new("pack_name_exists");
 
 pub const ROYALTYFEES: Map<(&str, &str), Decimal> = Map::new("royalty_fees");
 pub const ALLNFTPACKS: Map<&str, NftPack> = Map::new("all_nft_packs");
-pub const NFTPACKOWNERS: Map<&str, String> = Map::new("nft_pack_owners");
 pub const NFTPACKBALANCES: Map<&str, u64> = Map::new("nft_pack_balances");

@@ -42,5 +42,6 @@ pub enum ContractError {
     #[error("NFT item in pack should be this contract")]
     InvalidNftOwner {},
 
-
+    #[error("Not approved NFT pack")]
+    NotNftApproved {},
 }

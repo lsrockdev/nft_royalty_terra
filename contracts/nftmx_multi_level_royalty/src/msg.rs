@@ -56,7 +56,9 @@ pub enum ExecuteMsg<T> {
     /// Burn an NFT the sender has access to
     BurnPackable { token_id: String },
 
-    PackNfts { token_ids: Vec<String>, pack_name: String, price: Uint128, royalty_fee: Decimal }
+    PackNfts { token_ids: Vec<String>, pack_name: String, price: Uint128, royalty_fee: Decimal },
+    UnpackNfts { pack_id: u64 },
+    ApproveNftPack { to: String, pack_id: u64 }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

@@ -10,8 +10,7 @@ use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MintMsg};
 use crate::state::{
     Approval, Cw721Contract, TokenInfo, Config, CONFIG, ALLPACKABLENFTS, PackableToken, TOKENURIEXISTS,
-    TOKENNAMEEXISTS, NFTPACKCOUNTER, PACKNAMEEXISTS, NftPack, ROYALTYFEES, ALLNFTPACKS, NFTPACKOWNERS,
-    NFTPACKBALANCES
+    TOKENNAMEEXISTS, NFTPACKCOUNTER, PACKNAMEEXISTS, NftPack, ROYALTYFEES, ALLNFTPACKS, NFTPACKBALANCES
 };
 use cw_storage_plus::{Index, IndexList, IndexedMap, Item, Map, MultiIndex};
 
@@ -64,6 +63,8 @@ where
             ExecuteMsg::MintPackable(msg) => self.mint_packable(deps, env, info, msg),
             ExecuteMsg::PackNfts { token_ids, pack_name, price, royalty_fee } => 
                 self.pack_nfts(deps, env, info, token_ids, pack_name, price, royalty_fee),
+            ExecuteMsg::UnpackNfts { pack_id } => self.unpack_nfts(deps, env, info, pack_id),
+            ExecuteMsg::ApproveNftPack { to, pack_id } => self.approve_nft_pack(deps, env, info, to, pack_id),
             ExecuteMsg::Approve {
                 spender,
                 token_id,
@@ -230,7 +231,8 @@ where
             previous_price: Uint128::zero(),
             number_of_transfers: 0u64,
             for_sale: true,
-            royalty_owners: vec![info.sender.clone()]
+            royalty_owners: vec![info.sender.clone()],
+            approvals: vec![]
         };
         // save all NftPack
         ALLNFTPACKS.save(deps.storage, &pack_count.to_string(), &nft_pack)?;
@@ -238,12 +240,8 @@ where
         PACKNAMEEXISTS.update(deps.storage, &pack_name, |_| -> StdResult<_> {
             Ok(true)
         })?;
-        // save nft pack owner
-        NFTPACKOWNERS.update(deps.storage, &pack_count.clone().to_string(), |_| -> StdResult<_> {
-            Ok(info.sender.clone().to_string())
-        })?;
         //update nft pack balnace
-        NFTPACKBALANCES.update(deps.storage, &pack_count.clone().to_string(), |old| -> StdResult<_> {
+        NFTPACKBALANCES.update(deps.storage, &info.sender.clone().to_string(), |old| -> StdResult<_> {
             match old {
                 Some(v) => Ok(v + 1),
                 None => Ok(1u64),
@@ -269,13 +267,9 @@ where
         if nft_pack_balances < 1u64 {
             return Err(ContractError::NoNftBalance {});
         }
-        let nft_pack_owner = NFTPACKOWNERS.load(deps.storage, &info.sender.to_string())?;
-        if nft_pack_owner != info.sender {
-            return Err(ContractError::NoNftBalance {});
-        }
         let nft_pack = ALLNFTPACKS.load(deps.storage, &pack_id.to_string())?;
         if nft_pack.current_owner != info.sender {
-            return Err(ContractError::NoNftBalance {});
+            return Err(ContractError::NotNftOwner {});
         }
         let empty = ROYALTYFEES.may_load(deps.storage, (&pack_id.to_string(), &info.sender.clone().to_string()))?;
         if empty == None {
@@ -295,16 +289,79 @@ where
         PACKNAMEEXISTS.update(deps.storage, &nft_pack.pack_name, |_| -> StdResult<_> {
             Ok(false)
         })?;
-        NFTPACKBALANCES.update(deps.storage, &nft_pack.pack_id.clone().to_string(), |old| -> StdResult<_> {
+        NFTPACKBALANCES.update(deps.storage, &info.sender.clone().to_string(), |old| -> StdResult<_> {
             match old {
                 Some(v) => Ok(v - 1),
                 None => Ok(0u64),
             }
         })?;
         ALLNFTPACKS.remove(deps.storage, &pack_id.to_string());
-        NFTPACKOWNERS.remove(deps.storage, &info.sender.to_string());
         Ok(Response::new()
             .add_attribute("action", "unpack_nfts")
+            .add_attribute("pack_id", pack_id.to_string())
+        )
+    }
+
+    pub fn approve_nft_pack(
+        &self,
+        deps: DepsMut,
+        _env: Env,
+        info: MessageInfo,
+        to: String,
+        pack_id: u64
+    ) -> Result<Response<C>, ContractError> {
+        let mut nft_pack = ALLNFTPACKS.load(deps.storage, &pack_id.to_string())?;
+        if nft_pack.current_owner != info.sender {
+            return Err(ContractError::NotNftOwner {});
+        }
+        nft_pack.approvals.push(deps.api.addr_validate(&to)?);
+        ALLNFTPACKS.save(deps.storage, &pack_id.to_string(), &nft_pack)?;
+        Ok(Response::new()
+            .add_attribute("action", "approve_nft_pack")
+            .add_attribute("to", to)
+            .add_attribute("pack_id", pack_id.to_string())
+        )
+    }
+
+    pub fn transfer_nft_pack(
+        &self,
+        deps: DepsMut,
+        env: Env,
+        _info: MessageInfo,
+        from: String,
+        to: String,
+        pack_id: u64
+    ) -> Result<Response<C>, ContractError> {
+        let mut nft_pack = ALLNFTPACKS.load(deps.storage, &pack_id.to_string())?;
+        if nft_pack.current_owner.to_string() != from {
+            return Err(ContractError::NotNftOwner {});
+        }
+        if nft_pack.approvals.len() == 0 || nft_pack.approvals.iter().find(|&x| *x == env.contract.address.clone()) == None {
+            return Err(ContractError::NotNftApproved {});
+        }
+        nft_pack.previous_owner = Some(deps.api.addr_validate(&from)?);
+        nft_pack.current_owner = deps.api.addr_validate(&to)?;
+        nft_pack.previous_price = nft_pack.current_price.clone();
+        nft_pack.number_of_transfers = nft_pack.number_of_transfers.clone() + 1;
+        NFTPACKBALANCES.update(deps.storage, &from.clone(), |old| -> StdResult<_> {
+            match old {
+                Some(v) => Ok(v - 1),
+                None => Ok(0u64),
+            }
+        })?;
+        NFTPACKBALANCES.update(deps.storage, &to.clone(), |old| -> StdResult<_> {
+            match old {
+                Some(v) => Ok(v + 1),
+                None => Ok(0u64),
+            }
+        })?;
+        nft_pack.approvals = vec![];
+        ALLNFTPACKS.save(deps.storage, &pack_id.to_string(), &nft_pack)?;
+        Ok(Response::new()
+            .add_attribute("action", "approve_nft_pack")
+            .add_attribute("from", from)
+            .add_attribute("to", to)
+            .add_attribute("pack_id", pack_id.to_string())
         )
     }
 }
