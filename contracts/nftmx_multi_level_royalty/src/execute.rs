@@ -9,8 +9,8 @@ use cw721::{ContractInfoResponse, CustomMsg, Cw721Execute, Cw721ReceiveMsg, Expi
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MintMsg};
 use crate::state::{
-    Approval, Cw721Contract, TokenInfo, Config, CONFIG, ALLPACKABLENFTS,
-    PackableToken, TOKENURIEXISTS, TOKENNAMEEXISTS, NFTPACKCOUNTER, PACKNAMEEXISTS
+    Approval, Cw721Contract, TokenInfo, Config, CONFIG, ALLPACKABLENFTS, PackableToken, TOKENURIEXISTS,
+    TOKENNAMEEXISTS, NFTPACKCOUNTER, PACKNAMEEXISTS, NftPack, ROYALTYFEES, ALLNFTPACKS
 };
 use cw_storage_plus::{Index, IndexList, IndexedMap, Item, Map, MultiIndex};
 
@@ -192,14 +192,12 @@ where
         royalty_fee: Decimal
     ) -> Result<Response<C>, ContractError> {
         //increment NFT Pack counter
-        let val = self.token_count(deps.storage)? + 1;
-        NFTPACKCOUNTER.save(deps.storage, &val)?;
         let pack_name_exist = PACKNAMEEXISTS.load(deps.storage, &pack_name)?;
         if pack_name_exist {
             return Err(ContractError::ExistPackName {});
         }
         let mut pack_items: Vec<String> = vec![];
-        for token_id in token_ids {
+        for token_id in token_ids.clone() {
             let mut token = self.tokens.load(deps.storage, &token_id)?;
             self.check_can_send(deps.as_ref(), &env, &info, &token)?;
             let packable_nft = ALLPACKABLENFTS.load(deps.storage, &token_id)?;
@@ -213,6 +211,26 @@ where
             token.approvals = vec![];
             self.tokens.save(deps.storage, &token_id, &token)?;
         }
+        let pack_count = NFTPACKCOUNTER.load(deps.storage)? + 1;
+        // NFTPACKCOUNTER.save(deps.storage, &val)?;
+
+        // let nft_pack = NftPack {
+        //     pack_id: pack_count,
+        //     pack_name: pack_name,
+        //     item_count: token_ids.len(),
+        //     pack_items: pack_items,
+        //     minted_by: info.sender.clone(),
+        //     current_owner: info.sender.clone(),
+        //     previous_owner: None,
+        //     current_price: price,
+        //     previous_price: Uint128::zero(),
+        //     number_of_transfers: 0u64,
+        //     for_sale: true,
+        //     royalty_owners: vec![]
+        // };
+        // ALLNFTPACKS.save(deps.storage, &pack_count, &nft_pack)?;
+        NFTPACKCOUNTER.save(deps.storage, &pack_count)?;
+
         Ok(Response::new()
             .add_attribute("action", "burn_packable")
         )

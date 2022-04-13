@@ -165,11 +165,11 @@ pub struct PackableToken {
 pub struct NftPack {
     pub pack_id: u64,
     pub pack_name: String,
-    pub item_count: u64,
+    pub item_count: usize,
     pub pack_items: Vec<String>,
     pub minted_by: Addr,
     pub current_owner: Addr,
-    pub previous_owner: Addr,
+    pub previous_owner: Option<Addr>,
     pub current_price: Uint128,
     pub previous_price: Uint128,
     pub number_of_transfers: u64,
@@ -187,3 +187,4 @@ pub const TOKENNAMEEXISTS: Map<&str, bool> = Map::new("token_name_exists");
 pub const PACKNAMEEXISTS: Map<&str, bool> = Map::new("pack_name_exists");
 
 pub const ROYALTYFEES: Map<(&u64, &str), Decimal> = Map::new("royalty_fees");
+pub const ALLNFTPACKS: Map<&u64, NftPack> = Map::new("all_nft_packs");
