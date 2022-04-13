@@ -161,6 +161,7 @@ pub struct PackableToken {
     pub number_of_transfers: Uint128,
     pub for_sale: bool
 }
+
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct NftPack {
     pub pack_id: u64,
@@ -186,5 +187,7 @@ pub const TOKENNAMEEXISTS: Map<&str, bool> = Map::new("token_name_exists");
 
 pub const PACKNAMEEXISTS: Map<&str, bool> = Map::new("pack_name_exists");
 
-pub const ROYALTYFEES: Map<(&u64, &str), Decimal> = Map::new("royalty_fees");
-pub const ALLNFTPACKS: Map<&u64, NftPack> = Map::new("all_nft_packs");
+pub const ROYALTYFEES: Map<(&str, &str), Decimal> = Map::new("royalty_fees");
+pub const ALLNFTPACKS: Map<&str, NftPack> = Map::new("all_nft_packs");
+pub const NFTPACKOWNERS: Map<&str, String> = Map::new("nft_pack_owners");
+pub const NFTPACKBALANCES: Map<&str, u64> = Map::new("nft_pack_balances");

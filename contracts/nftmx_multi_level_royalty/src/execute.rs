@@ -10,7 +10,8 @@ use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MintMsg};
 use crate::state::{
     Approval, Cw721Contract, TokenInfo, Config, CONFIG, ALLPACKABLENFTS, PackableToken, TOKENURIEXISTS,
-    TOKENNAMEEXISTS, NFTPACKCOUNTER, PACKNAMEEXISTS, NftPack, ROYALTYFEES, ALLNFTPACKS
+    TOKENNAMEEXISTS, NFTPACKCOUNTER, PACKNAMEEXISTS, NftPack, ROYALTYFEES, ALLNFTPACKS, NFTPACKOWNERS,
+    NFTPACKBALANCES
 };
 use cw_storage_plus::{Index, IndexList, IndexedMap, Item, Map, MultiIndex};
 
@@ -61,6 +62,8 @@ where
     ) -> Result<Response<C>, ContractError> {
         match msg {
             ExecuteMsg::MintPackable(msg) => self.mint_packable(deps, env, info, msg),
+            ExecuteMsg::PackNfts { token_ids, pack_name, price, royalty_fee } => 
+                self.pack_nfts(deps, env, info, token_ids, pack_name, price, royalty_fee),
             ExecuteMsg::Approve {
                 spender,
                 token_id,
@@ -211,28 +214,47 @@ where
             token.approvals = vec![];
             self.tokens.save(deps.storage, &token_id, &token)?;
         }
+        // increase pack count
         let pack_count = NFTPACKCOUNTER.load(deps.storage)? + 1;
-        // NFTPACKCOUNTER.save(deps.storage, &val)?;
-
-        // let nft_pack = NftPack {
-        //     pack_id: pack_count,
-        //     pack_name: pack_name,
-        //     item_count: token_ids.len(),
-        //     pack_items: pack_items,
-        //     minted_by: info.sender.clone(),
-        //     current_owner: info.sender.clone(),
-        //     previous_owner: None,
-        //     current_price: price,
-        //     previous_price: Uint128::zero(),
-        //     number_of_transfers: 0u64,
-        //     for_sale: true,
-        //     royalty_owners: vec![]
-        // };
-        // ALLNFTPACKS.save(deps.storage, &pack_count, &nft_pack)?;
         NFTPACKCOUNTER.save(deps.storage, &pack_count)?;
 
+        let nft_pack = NftPack {
+            pack_id: pack_count,
+            pack_name: pack_name.clone(),
+            item_count: token_ids.len(),
+            pack_items: pack_items,
+            minted_by: info.sender.clone(),
+            current_owner: info.sender.clone(),
+            previous_owner: None,
+            current_price: price,
+            previous_price: Uint128::zero(),
+            number_of_transfers: 0u64,
+            for_sale: true,
+            royalty_owners: vec![info.sender.clone()]
+        };
+        // save all NftPack
+        ALLNFTPACKS.save(deps.storage, &pack_count.to_string(), &nft_pack)?;
+        //update pack name exists
+        PACKNAMEEXISTS.update(deps.storage, &pack_name, |_| -> StdResult<_> {
+            Ok(true)
+        })?;
+        // save nft pack owner
+        NFTPACKOWNERS.update(deps.storage, &pack_count.clone().to_string(), |_| -> StdResult<_> {
+            Ok(info.sender.clone().to_string())
+        })?;
+        //update nft pack balnace
+        NFTPACKBALANCES.update(deps.storage, &pack_count.clone().to_string(), |old| -> StdResult<_> {
+            match old {
+                Some(v) => Ok(v + 1),
+                None => Ok(1u64),
+            }
+        })?;
+
+        ROYALTYFEES.save(deps.storage, (&pack_count.to_string(), &info.sender.clone().to_string()), &royalty_fee)?;
         Ok(Response::new()
-            .add_attribute("action", "burn_packable")
+            .add_attribute("action", "pack_nfts")
+            .add_attribute("pack_id", pack_count.to_string())
+            .add_attribute("pack_name", pack_name)
         )
     }
 }

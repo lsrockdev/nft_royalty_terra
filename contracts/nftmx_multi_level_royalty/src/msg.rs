@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{ Binary, Uint128 };
+use cosmwasm_std::{ Binary, Uint128, Decimal };
 use cw721::Expiration;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -55,6 +55,8 @@ pub enum ExecuteMsg<T> {
 
     /// Burn an NFT the sender has access to
     BurnPackable { token_id: String },
+
+    PackNfts { token_ids: Vec<String>, pack_name: String, price: Uint128, royalty_fee: Decimal }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
