@@ -2,6 +2,7 @@ use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
+use std::collections::HashMap;
 
 use cosmwasm_std::{Addr, BlockInfo, StdResult, Storage, Decimal, Uint128};
 
@@ -160,9 +161,29 @@ pub struct PackableToken {
     pub number_of_transfers: Uint128,
     pub for_sale: bool
 }
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+pub struct NftPack {
+    pub pack_id: u64,
+    pub pack_name: String,
+    pub item_count: u64,
+    pub pack_items: Vec<String>,
+    pub minted_by: Addr,
+    pub current_owner: Addr,
+    pub previous_owner: Addr,
+    pub current_price: Uint128,
+    pub previous_price: Uint128,
+    pub number_of_transfers: u64,
+    pub for_sale: bool,
+    pub royalty_owners: Vec<Addr>
+}
 
 pub const CONFIG: Item<Config> = Item::new("config");
+pub const NFTPACKCOUNTER: Item<u64> = Item::new("nft_pack_counter");
 
 pub const ALLPACKABLENFTS: Map<&str, PackableToken> = Map::new("app_packable_nfts");
 pub const TOKENURIEXISTS: Map<&str, bool> = Map::new("token_uri_exists");
 pub const TOKENNAMEEXISTS: Map<&str, bool> = Map::new("token_name_exists");
+
+pub const PACKNAMEEXISTS: Map<&str, bool> = Map::new("pack_name_exists");
+
+pub const ROYALTYFEES: Map<(&u64, &str), Decimal> = Map::new("royalty_fees");

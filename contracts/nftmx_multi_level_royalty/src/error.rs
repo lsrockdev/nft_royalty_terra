@@ -23,4 +23,11 @@ pub enum ContractError {
 
     #[error("already exist token name")]
     ExistTokenName {},
+
+    #[error("already exist pack name")]
+    ExistPackName {},
+
+    #[error("not nft owner")]
+    NotNftOwner {},
+
 }

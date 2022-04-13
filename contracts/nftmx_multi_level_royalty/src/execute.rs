@@ -8,7 +8,10 @@ use cw721::{ContractInfoResponse, CustomMsg, Cw721Execute, Cw721ReceiveMsg, Expi
 
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MintMsg};
-use crate::state::{Approval, Cw721Contract, TokenInfo, Config, CONFIG, ALLPACKABLENFTS, PackableToken, TOKENURIEXISTS, TOKENNAMEEXISTS };
+use crate::state::{
+    Approval, Cw721Contract, TokenInfo, Config, CONFIG, ALLPACKABLENFTS,
+    PackableToken, TOKENURIEXISTS, TOKENNAMEEXISTS, NFTPACKCOUNTER, PACKNAMEEXISTS
+};
 use cw_storage_plus::{Index, IndexList, IndexedMap, Item, Map, MultiIndex};
 
 // version info for migration info
@@ -44,7 +47,8 @@ where
             max_royalyty_owner: 10u64,
             buy_sell_fee: Decimal::one()
         };
-        CONFIG.save(deps.storage, &con)?;    
+        CONFIG.save(deps.storage, &con)?;
+        NFTPACKCOUNTER.save(deps.storage, &0u64)?;
         Ok(Response::default())
     }
 
@@ -177,6 +181,42 @@ where
             .add_attribute("token_id", token_id))
     }
 
+    pub fn pack_nfts(
+        &self,
+        deps: DepsMut,
+        env: Env,
+        info: MessageInfo,
+        token_ids: Vec<String>,
+        pack_name: String,
+        price: Uint128,
+        royalty_fee: Decimal
+    ) -> Result<Response<C>, ContractError> {
+        //increment NFT Pack counter
+        let val = self.token_count(deps.storage)? + 1;
+        NFTPACKCOUNTER.save(deps.storage, &val)?;
+        let pack_name_exist = PACKNAMEEXISTS.load(deps.storage, &pack_name)?;
+        if pack_name_exist {
+            return Err(ContractError::ExistPackName {});
+        }
+        let mut pack_items: Vec<String> = vec![];
+        for token_id in token_ids {
+            let mut token = self.tokens.load(deps.storage, &token_id)?;
+            self.check_can_send(deps.as_ref(), &env, &info, &token)?;
+            let packable_nft = ALLPACKABLENFTS.load(deps.storage, &token_id)?;
+            if packable_nft.current_owner != info.sender {
+                return Err(ContractError::NotNftOwner {});
+            }
+            pack_items.push(token_id.clone());
+
+            //transfter token to this
+            token.owner = env.contract.address.clone();
+            token.approvals = vec![];
+            self.tokens.save(deps.storage, &token_id, &token)?;
+        }
+        Ok(Response::new()
+            .add_attribute("action", "burn_packable")
+        )
+    }
 }
 
 impl<'a, T, C> Cw721Execute<T, C> for Cw721Contract<'a, T, C>
