@@ -44,4 +44,8 @@ pub enum ContractError {
 
     #[error("Not approved NFT pack")]
     NotNftApproved {},
+
+    #[error("Insufficient funds")]
+    InsufficientFunds {},
+    
 }

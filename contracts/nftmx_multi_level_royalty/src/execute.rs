@@ -1,7 +1,7 @@
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use cosmwasm_std::{Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Decimal, Uint128};
+use cosmwasm_std::{Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Decimal, Uint128, CosmosMsg};
 
 use cw2::set_contract_version;
 use cw721::{ContractInfoResponse, CustomMsg, Cw721Execute, Cw721ReceiveMsg, Expiration};
@@ -13,6 +13,7 @@ use crate::state::{
     TOKENNAMEEXISTS, NFTPACKCOUNTER, PACKNAMEEXISTS, NftPack, ROYALTYFEES, ALLNFTPACKS, NFTPACKBALANCES
 };
 use cw_storage_plus::{Index, IndexList, IndexedMap, Item, Map, MultiIndex};
+use crate::asset::{Asset, AssetInfo};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw721-base";
@@ -45,7 +46,8 @@ where
             max_packable_nft: 5000u64,
             max_pack_item_count: 10u64,
             max_royalyty_owner: 10u64,
-            buy_sell_fee: Decimal::one()
+            buy_sell_fee: Decimal::one(),
+            contract_owner: deps.api.addr_validate(&msg.minter)?
         };
         CONFIG.save(deps.storage, &con)?;
         NFTPACKCOUNTER.save(deps.storage, &0u64)?;
@@ -65,6 +67,8 @@ where
                 self.pack_nfts(deps, env, info, token_ids, pack_name, price, royalty_fee),
             ExecuteMsg::UnpackNfts { pack_id } => self.unpack_nfts(deps, env, info, pack_id),
             ExecuteMsg::ApproveNftPack { to, pack_id } => self.approve_nft_pack(deps, env, info, to, pack_id),
+            ExecuteMsg::TransferNftPack { from, to, pack_id }
+                => self.transfer_nft_pack(deps, env, info, from, to, pack_id),
             ExecuteMsg::Approve {
                 spender,
                 token_id,
@@ -358,12 +362,61 @@ where
         nft_pack.approvals = vec![];
         ALLNFTPACKS.save(deps.storage, &pack_id.to_string(), &nft_pack)?;
         Ok(Response::new()
-            .add_attribute("action", "approve_nft_pack")
+            .add_attribute("action", "transfer_nft_pack")
             .add_attribute("from", from)
             .add_attribute("to", to)
             .add_attribute("pack_id", pack_id.to_string())
         )
     }
+
+    pub fn buy_nft_pack(
+        &self,
+        deps: DepsMut,
+        env: Env,
+        info: MessageInfo,
+        pack_id: u64
+    ) -> Result<Response<C>, ContractError> {
+        let mut nft_pack = ALLNFTPACKS.load(deps.storage, &pack_id.to_string())?;
+        if nft_pack.current_owner != info.sender {
+            return Err(ContractError::NotNftOwner {});
+        }
+        if info.funds.len() < 1 || info.funds[0].amount < nft_pack.current_price  {
+            return Err(ContractError::InsufficientFunds {});
+        }
+
+        let con = CONFIG.load(deps.storage)?;
+        let mut fee = info.funds[0].amount * con.buy_sell_fee;
+        let mut messages: Vec<CosmosMsg> = vec![];
+        let fee_asset = Asset {
+            info: AssetInfo::NativeToken{ denom: "uusd"},
+            amount: fee
+        };
+        messages.push(fee_asset.into_msg(&deps.querier, con.contract_owner.clone().to_string())?);
+        if nft_pack.current_price > nft_pack.previous_price {
+            for owner in nft_pack.royalty_owners {
+                let royalty_fee = ROYALTYFEES.load(deps.storage, (&pack_id.to_string(), &owner.to_string()))?;
+                let royalty = (nft_pack.current_price - nft_pack.previous_price) * royalty_fee;
+                let royalty_asset = Asset {
+                    info: AssetInfo::NativeToken{ denom: "uusd"},
+                    amount: royalty
+                };
+                messages.push(royalty_asset.into_msg(&deps.querier, owner.clone().to_string())?);
+                fee = fee + royalty;
+            }
+        }
+        let current_owner_fee_asset = Asset {
+            info: AssetInfo::NativeToken{ denom: "uusd"},
+            amount: info.funds[0].amount - fee
+        };
+        messages.push(current_owner_fee_asset.into_msg(&deps.querier, info.sender.clone().to_string())?);
+
+        //TODO transfer nft pack to sender
+        Ok(Response::new()
+            .add_attribute("action", "buy_nft_pack")
+            .add_attribute("pack_id", pack_id.to_string())
+        )
+    }
+
 }
 
 impl<'a, T, C> Cw721Execute<T, C> for Cw721Contract<'a, T, C>

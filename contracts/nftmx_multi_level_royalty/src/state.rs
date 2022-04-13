@@ -96,6 +96,7 @@ pub struct Config {
     pub max_pack_item_count: u64,
     pub max_royalyty_owner: u64,
     pub buy_sell_fee: Decimal,
+    pub contract_owner: Addr
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
