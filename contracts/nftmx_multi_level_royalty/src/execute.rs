@@ -76,6 +76,9 @@ where
             ExecuteMsg::UnpackTokens { pack_id } => self.unpack_tokens(deps, env, info, pack_id),
             ExecuteMsg::ApproveTokenPack { pack_id, to } => self.approve_token_pack(deps, env, info, pack_id, to),
             ExecuteMsg::TransferTokenPack { pack_id, from, to } => self.transfer_token_pack(deps, env, info, pack_id, from, to),
+            ExecuteMsg::BuyTokenPack { pack_id } => self.buy_token_pack(deps, env, info, pack_id),
+            ExecuteMsg::SetBuyCellFee { fee } => self.set_buy_cell_fee(deps, env, info, fee),
+            ExecuteMsg::ChangeTokenPrice { token_id, price } => self.change_token_price(deps, env, info, token_id, price),
             ExecuteMsg::Approve {
                 spender,
                 token_id,
@@ -585,6 +588,95 @@ where
             .add_attribute("pack_id", pack_id.to_string())
             .add_attribute("from", from)
             .add_attribute("to", to)
+        )
+    }
+
+    pub fn buy_token_pack(
+        &self,
+        deps: DepsMut,
+        _env: Env,
+        info: MessageInfo,
+        pack_id: u64,
+    ) -> Result<Response<C>, ContractError> {
+        let token_pack = ALLTOKENPACKS.load(deps.storage, &pack_id.to_string())?;
+        if token_pack.current_owner != info.sender {
+            return Err(ContractError::NotTokenPackOwner {});
+        }
+        if info.funds.len() < 1 || info.funds[0].amount < token_pack.current_price  {
+            return Err(ContractError::InsufficientFunds {});
+        }
+        let con = CONFIG.load(deps.storage)?;
+        let mut fee = info.funds[0].amount * con.buy_sell_fee;
+        let mut messages: Vec<CosmosMsg> = vec![];
+        let fee_asset = Asset {
+            info: AssetInfo::NativeToken{ denom: "uusd".to_string()},
+            amount: fee
+        };
+        messages.push(fee_asset.into_msg(&deps.querier, con.contract_owner.clone())?);
+        if token_pack.current_price > token_pack.previous_price {
+            for owner in token_pack.royalty_owners {
+                let royalty_fee = TOKENROYALTYFEES.load(deps.storage, (&pack_id.to_string(), &owner.to_string()))?;
+                let royalty = (token_pack.current_price - token_pack.previous_price) * royalty_fee;
+                let royalty_asset = Asset {
+                    info: AssetInfo::NativeToken{ denom: "uusd".to_string()},
+                    amount: royalty
+                };
+                messages.push(royalty_asset.into_msg(&deps.querier, owner.clone())?);
+                fee = fee + royalty;
+            }
+        }
+        let current_owner_fee_asset = Asset {
+            info: AssetInfo::NativeToken{ denom: "uusd".to_string()},
+            amount: info.funds[0].amount - fee
+        };
+        messages.push(current_owner_fee_asset.into_msg(&deps.querier, info.sender.clone())?);
+        //TODO transfer token pack
+        Ok(Response::new()
+            .add_attribute("action", "transfer_token_pack")
+            .add_attribute("pack_id", pack_id.to_string())
+        )
+    }
+
+    pub fn set_buy_cell_fee(
+        &self,
+        deps: DepsMut,
+        _env: Env,
+        info: MessageInfo,
+        fee: Decimal,
+    ) -> Result<Response<C>, ContractError> {
+        let con = CONFIG.load(deps.storage)?;
+        if con.contract_owner != info.sender {
+            return Err(ContractError::Unauthorized {});
+        }
+        CONFIG.update(deps.storage, |mut c| -> StdResult<_> {
+            c.buy_sell_fee = fee;
+            Ok(c)
+        })?;
+        Ok(Response::new()
+            .add_attribute("action", "set_buy_cell_fee")
+        )
+    }
+
+    pub fn change_token_price(
+        &self,
+        deps: DepsMut,
+        _env: Env,
+        info: MessageInfo,
+        token_id: String,
+        price: Uint128
+    ) -> Result<Response<C>, ContractError> {
+        let missing = ALLPACKABLENFTS.may_load(deps.storage, &token_id.clone())?;
+        if missing == None {
+            return Err(ContractError::NoPackableToken {});
+        }
+        let mut token = ALLPACKABLENFTS.load(deps.storage, &token_id.clone())?;
+        if token.current_owner != info.sender {
+            return Err(ContractError::Unauthorized {});
+        }
+        token.price = price;
+        ALLPACKABLENFTS.save(deps.storage, &token_id.clone(), &token)?;
+        Ok(Response::new()
+            .add_attribute("action", "change_token_price")
         )
     }
 }

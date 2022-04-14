@@ -60,4 +60,7 @@ pub enum ContractError {
     #[error("Not approved Token pack")]
     NotTokenApproved {},
 
+    #[error("No the packable token")]
+    NoPackableToken {},
+
 }
