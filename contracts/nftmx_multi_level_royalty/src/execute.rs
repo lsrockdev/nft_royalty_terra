@@ -71,6 +71,9 @@ where
             ExecuteMsg::ApproveNftPack { to, pack_id } => self.approve_nft_pack(deps, env, info, to, pack_id),
             ExecuteMsg::TransferNftPack { from, to, pack_id }
                 => self.transfer_nft_pack(deps, env, info, from, to, pack_id),
+            ExecuteMsg::PackTokens { pack_name, token_address, amount, price, royalty_fee }
+                => self.pack_tokens(deps, env, info, pack_name, token_address, amount, price, royalty_fee),
+            ExecuteMsg::UnpackTokens { pack_id } => self.unpack_tokens(deps, env, info, pack_id),
             ExecuteMsg::Approve {
                 spender,
                 token_id,
@@ -372,11 +375,11 @@ where
     pub fn buy_nft_pack(
         &self,
         deps: DepsMut,
-        env: Env,
+        _env: Env,
         info: MessageInfo,
         pack_id: u64
     ) -> Result<Response<C>, ContractError> {
-        let mut nft_pack = ALLNFTPACKS.load(deps.storage, &pack_id.to_string())?;
+        let nft_pack = ALLNFTPACKS.load(deps.storage, &pack_id.to_string())?;
         if nft_pack.current_owner != info.sender {
             return Err(ContractError::NotNftOwner {});
         }
@@ -479,7 +482,7 @@ where
     pub fn unpack_tokens(
         &self,
         deps: DepsMut,
-        env: Env,
+        _env: Env,
         info: MessageInfo,
         pack_id: u64,
     ) -> Result<Response<C>, ContractError> {

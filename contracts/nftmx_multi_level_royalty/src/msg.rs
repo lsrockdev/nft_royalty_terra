@@ -59,7 +59,10 @@ pub enum ExecuteMsg<T> {
     PackNfts { token_ids: Vec<String>, pack_name: String, price: Uint128, royalty_fee: Decimal },
     UnpackNfts { pack_id: u64 },
     ApproveNftPack { to: String, pack_id: u64 },
-    TransferNftPack { from: String, to: String, pack_id: u64 }
+    TransferNftPack { from: String, to: String, pack_id: u64 },
+    PackTokens { pack_name: String, token_address: String, amount: Uint128, price: Uint128, royalty_fee: Decimal },
+    UnpackTokens { pack_id: u64 }
+
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
