@@ -11,7 +11,7 @@ use crate::msg::{ExecuteMsg, InstantiateMsg, MintMsg};
 use crate::state::{
     Approval, Cw721Contract, TokenInfo, Config, CONFIG, ALLPACKABLENFTS, PackableToken, TOKENURIEXISTS,
     TOKENNAMEEXISTS, NFTPACKCOUNTER, PACKNAMEEXISTS, NftPack, ROYALTYFEES, ALLNFTPACKS, NFTPACKBALANCES,
-    TokenPack, ALLTOKENPACKS
+    TokenPack, ALLTOKENPACKS, TOKENPACKCOUNTER, TOKENPACKNAMEEXISTS, TOKENPACKBALANCES, TOKENROYALTYFEES
 };
 use cw_storage_plus::{Index, IndexList, IndexedMap, Item, Map, MultiIndex};
 use crate::asset::{Asset, AssetInfo};
@@ -52,6 +52,7 @@ where
         };
         CONFIG.save(deps.storage, &con)?;
         NFTPACKCOUNTER.save(deps.storage, &0u64)?;
+        TOKENPACKCOUNTER.save(deps.storage, &0u64)?;
         Ok(Response::default())
     }
 
@@ -121,14 +122,12 @@ where
         if token_name_exist {
             return Err(ContractError::ExistTokenName {});
         }
-
         // create the token
         let token = TokenInfo {
             owner: deps.api.addr_validate(&msg.owner)?,
             approvals: vec![],
             token_uri: msg.token_uri.clone(),
             extension: msg.extension.clone()
-            // extension: msg.extension,
         };
         self.tokens
             .update(deps.storage, &msg.token_id.clone(), |old| match old {
@@ -201,8 +200,8 @@ where
         royalty_fee: Decimal
     ) -> Result<Response<C>, ContractError> {
         //increment NFT Pack counter
-        let pack_name_exist = PACKNAMEEXISTS.load(deps.storage, &pack_name)?;
-        if pack_name_exist {
+        let pack_name_exist = PACKNAMEEXISTS.may_load(deps.storage, &pack_name)?;
+        if pack_name_exist != None {
             return Err(ContractError::ExistPackName {});
         }
         let mut pack_items: Vec<String> = vec![];
@@ -389,27 +388,27 @@ where
         let mut fee = info.funds[0].amount * con.buy_sell_fee;
         let mut messages: Vec<CosmosMsg> = vec![];
         let fee_asset = Asset {
-            info: AssetInfo::NativeToken{ denom: "uusd"},
+            info: AssetInfo::NativeToken{ denom: "uusd".to_string()},
             amount: fee
         };
-        messages.push(fee_asset.into_msg(&deps.querier, con.contract_owner.clone().to_string())?);
+        messages.push(fee_asset.into_msg(&deps.querier, con.contract_owner.clone())?);
         if nft_pack.current_price > nft_pack.previous_price {
             for owner in nft_pack.royalty_owners {
                 let royalty_fee = ROYALTYFEES.load(deps.storage, (&pack_id.to_string(), &owner.to_string()))?;
                 let royalty = (nft_pack.current_price - nft_pack.previous_price) * royalty_fee;
                 let royalty_asset = Asset {
-                    info: AssetInfo::NativeToken{ denom: "uusd"},
+                    info: AssetInfo::NativeToken{ denom: "uusd".to_string()},
                     amount: royalty
                 };
-                messages.push(royalty_asset.into_msg(&deps.querier, owner.clone().to_string())?);
+                messages.push(royalty_asset.into_msg(&deps.querier, owner.clone())?);
                 fee = fee + royalty;
             }
         }
         let current_owner_fee_asset = Asset {
-            info: AssetInfo::NativeToken{ denom: "uusd"},
+            info: AssetInfo::NativeToken{ denom: "uusd".to_string()},
             amount: info.funds[0].amount - fee
         };
-        messages.push(current_owner_fee_asset.into_msg(&deps.querier, info.sender.clone().to_string())?);
+        messages.push(current_owner_fee_asset.into_msg(&deps.querier, info.sender.clone())?);
 
         //TODO transfer nft pack to sender
         Ok(Response::new()
@@ -418,8 +417,76 @@ where
         )
     }
 
+    pub fn pack_tokens(
+        &self,
+        deps: DepsMut,
+        _env: Env,
+        info: MessageInfo,
+        pack_name: String,
+        token_address: String,
+        amount: Uint128,
+        price: Uint128,
+        royalty_fee: Decimal
+    ) -> Result<Response<C>, ContractError> {
+        let pack_name_exist = TOKENPACKNAMEEXISTS.may_load(deps.storage, &pack_name)?;
+        if pack_name_exist != None {
+            return Err(ContractError::ExistPackName {});
+        }
+        // TODO - transfer token to this smart contract - should be performed by user
+        let pack_count = TOKENPACKCOUNTER.load(deps.storage)? + 1;
+        TOKENPACKCOUNTER.save(deps.storage, &pack_count)?;
 
+        let token_pack = TokenPack {
+            pack_id: pack_count,
+            pack_name: pack_name.clone(),
+            token_address: deps.api.addr_validate(&token_address.clone())?,
+            minted_by: info.sender.clone(),
+            current_owner: info.sender.clone(),
+            previous_owner: None,
+            current_price: price,
+            previous_price: Uint128::zero(),
+            number_of_transfers: 0u64,
+            for_sale: true,
+            royalty_owners: vec![info.sender.clone()],
+        };
+        
+        // update all TokenPack
+        ALLTOKENPACKS.save(deps.storage, &pack_count.to_string(), &token_pack)?;
+        //update pack name exists
+        TOKENPACKNAMEEXISTS.update(deps.storage, &pack_name, |_| -> StdResult<_> {
+            Ok(true)
+        })?;
+        //update token packabale balance
+        TOKENPACKBALANCES.update(deps.storage, &info.sender.clone().to_string(), |old| -> StdResult<_> {
+            match old {
+                Some(v) => Ok(v + 1),
+                None => Ok(1u64),
+            }
+        })?;
+        TOKENROYALTYFEES.save(deps.storage, (&pack_count.to_string(), &info.sender.clone().to_string()), &royalty_fee)?;
 
+        Ok(Response::new()
+            .add_attribute("action", "pack_tokens")
+            .add_attribute("pack_name", pack_name)
+            .add_attribute("token_address", token_address)
+            .add_attribute("amount", amount.to_string())
+            .add_attribute("price", price.to_string())
+            .add_attribute("royalty_fee", royalty_fee.to_string())
+        )
+    }
+
+    pub fn unpack_tokens(
+        &self,
+        deps: DepsMut,
+        env: Env,
+        info: MessageInfo,
+        pack_id: u64,
+    ) -> Result<Response<C>, ContractError> {
+
+        Ok(Response::new()
+            .add_attribute("action", "unpack_tokens")
+        )
+    }
 }
 
 impl<'a, T, C> Cw721Execute<T, C> for Cw721Contract<'a, T, C>

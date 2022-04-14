@@ -2,8 +2,6 @@ use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
-use std::collections::HashMap;
-
 use cosmwasm_std::{Addr, BlockInfo, StdResult, Storage, Decimal, Uint128};
 
 use cw721::{ContractInfoResponse, CustomMsg, Cw721, Expiration};
@@ -210,4 +208,8 @@ pub struct TokenPack {
 }
 
 pub const ALLTOKENPACKS: Map<&str, TokenPack> = Map::new("all_token_packs");
+pub const TOKENPACKCOUNTER: Item<u64> = Item::new("token_pack_counter");
+pub const TOKENPACKNAMEEXISTS: Map<&str, bool> = Map::new("token_pack_name_exists");
+pub const TOKENPACKBALANCES: Map<&str, u64> = Map::new("token_pack_balances");
+pub const TOKENROYALTYFEES: Map<(&str, &str), Decimal> = Map::new("token_royalty_fees");
 

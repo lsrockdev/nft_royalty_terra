@@ -5,7 +5,6 @@ use cosmwasm_std::{to_binary, Addr, BankMsg, Coin, CosmosMsg, Decimal, MessageIn
   Uint128, WasmMsg};
 use cw20::{Cw20ExecuteMsg};
 use terra_cosmwasm::TerraQuerier;
-
 static DECIMAL_FRACTION: Uint128 = Uint128::new(1_000_000_000_000_000_000u128);
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -107,44 +106,51 @@ impl Asset{
         })?,
         funds: vec![],
       })),
-      AssetInfo::NativeToken { .. } => Ok(CosmosMsg::Bank(BankMsg::Send {
+      AssetInfo::NativeToken { denom } => Ok(CosmosMsg::Bank(BankMsg::Send {
         to_address: recipient.to_string(),
-        amount: vec![self.deduct_tax(querier)?],
+        // amount: vec![self.deduct_tax(querier)?],
+        amount: vec![Coin {
+          denom: denom.to_string(),
+          amount: amount
+        }],
+
       })),
     }
   }
 
-  pub fn deduct_tax(&self, querier: &QuerierWrapper) -> StdResult<Coin> {
-    let amount = self.amount;
-    if let AssetInfo::NativeToken { denom } = &self.info {
-      Ok(Coin {
-        denom: denom.to_string(),
-        amount: amount.checked_sub(self.compute_tax(querier)?)?,
-      })
-    } else {
-      Err(StdError::generic_err("cannot deduct tax from token asset"))
-    }
-  }
+  //TODO fix compile error on new cosmwasm_std
 
-  pub fn compute_tax(&self, querier: &QuerierWrapper) -> StdResult<Uint128> {
-    let amount = self.amount;
-    if let AssetInfo::NativeToken { denom } = &self.info {
-      if denom == "uluna" {
-        Ok(Uint128::zero())
-      } else {
-        let terra_querier = TerraQuerier::new(querier);
-        let tax_rate: Decimal = (terra_querier.query_tax_rate()?).rate;
-        let tax_cap: Uint128 = (terra_querier.query_tax_cap(denom.to_string())?).cap;
-        Ok(std::cmp::min(
-          amount.checked_sub(amount.multiply_ratio(
-            DECIMAL_FRACTION,
-            DECIMAL_FRACTION * tax_rate + DECIMAL_FRACTION,
-          ))?,
-          tax_cap,
-        ))
-      }
-    } else {
-      Ok(Uint128::zero())
-    }
-  }
+  // pub fn deduct_tax(&self, querier: &QuerierWrapper) -> StdResult<Coin> {
+  //   let amount = self.amount;
+  //   if let AssetInfo::NativeToken { denom } = &self.info {
+  //     Ok(Coin {
+  //       denom: denom.to_string(),
+  //       amount: amount.checked_sub(self.compute_tax(querier)?)?,
+  //     })
+  //   } else {
+  //     Err(StdError::generic_err("cannot deduct tax from token asset"))
+  //   }
+  // }
+
+  // pub fn compute_tax(&self, querier: &QuerierWrapper) -> StdResult<Uint128> {
+  //   let amount = self.amount;
+  //   if let AssetInfo::NativeToken { denom } = &self.info {
+  //     if denom == "uluna" {
+  //       Ok(Uint128::zero())
+  //     } else {
+  //       let terra_querier = TerraQuerier::new(querier);
+  //       let tax_rate = (terra_querier.query_tax_rate()).rate;
+  //       let tax_cap: Uint128 = (terra_querier.query_tax_cap(denom.to_string())?).cap;
+  //       Ok(std::cmp::min(
+  //         amount.checked_sub(amount.multiply_ratio(
+  //           DECIMAL_FRACTION,
+  //           DECIMAL_FRACTION * tax_rate + DECIMAL_FRACTION,
+  //         ))?,
+  //         tax_cap,
+  //       ))
+  //     }
+  //   } else {
+  //     Ok(Uint128::zero())
+  //   }
+  // }
 }
