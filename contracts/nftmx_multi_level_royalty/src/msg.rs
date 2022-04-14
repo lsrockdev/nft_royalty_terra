@@ -66,7 +66,9 @@ pub enum ExecuteMsg<T> {
     TransferTokenPack { pack_id: u64, from: String, to: String },
     BuyTokenPack { pack_id: u64 },
     SetBuyCellFee { fee: Decimal },
-    ChangeTokenPrice { token_id: String, price: Uint128 }
+    SetTokenPrice { token_id: String, price: Uint128 },
+    SetNftPackPrice { pack_id: u64, price: Uint128 },
+    SetTokenPackPrice { pack_id: u64, price: Uint128 },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

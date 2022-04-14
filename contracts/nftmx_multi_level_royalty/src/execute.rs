@@ -78,7 +78,9 @@ where
             ExecuteMsg::TransferTokenPack { pack_id, from, to } => self.transfer_token_pack(deps, env, info, pack_id, from, to),
             ExecuteMsg::BuyTokenPack { pack_id } => self.buy_token_pack(deps, env, info, pack_id),
             ExecuteMsg::SetBuyCellFee { fee } => self.set_buy_cell_fee(deps, env, info, fee),
-            ExecuteMsg::ChangeTokenPrice { token_id, price } => self.change_token_price(deps, env, info, token_id, price),
+            ExecuteMsg::SetTokenPrice { token_id, price } => self.set_token_price(deps, env, info, token_id, price),
+            ExecuteMsg::SetNftPackPrice { pack_id, price } => self.set_nft_pack_price(deps, env, info, pack_id, price),
+            ExecuteMsg::SetTokenPackPrice { pack_id, price } => self.set_token_pack_price(deps, env, info, pack_id, price),        
             ExecuteMsg::Approve {
                 spender,
                 token_id,
@@ -657,7 +659,7 @@ where
         )
     }
 
-    pub fn change_token_price(
+    pub fn set_token_price(
         &self,
         deps: DepsMut,
         _env: Env,
@@ -676,9 +678,64 @@ where
         token.price = price;
         ALLPACKABLENFTS.save(deps.storage, &token_id.clone(), &token)?;
         Ok(Response::new()
-            .add_attribute("action", "change_token_price")
+            .add_attribute("action", "set_token_price")
+            .add_attribute("token_id", token_id)
+            .add_attribute("price", price.to_string())
         )
     }
+
+    pub fn set_nft_pack_price(
+        &self,
+        deps: DepsMut,
+        _env: Env,
+        info: MessageInfo,
+        pack_id: u64,
+        price: Uint128
+    ) -> Result<Response<C>, ContractError> {
+        let missing = ALLNFTPACKS.may_load(deps.storage, &pack_id.clone().to_string())?;
+        if missing == None {
+            return Err(ContractError::NoPackableToken {});
+        }
+        let mut pack = ALLNFTPACKS.load(deps.storage, &pack_id.clone().to_string())?;
+        if pack.current_owner != info.sender {
+            return Err(ContractError::Unauthorized {});
+        }
+        pack.current_price = price;
+        ALLNFTPACKS.save(deps.storage, &pack_id.clone().to_string(), &pack)?;
+        Ok(Response::new()
+            .add_attribute("action", "set_nft_pack_price")
+            .add_attribute("pack_id", pack_id.to_string())
+            .add_attribute("price", price.to_string())
+        )
+    }
+
+    pub fn set_token_pack_price(
+        &self,
+        deps: DepsMut,
+        _env: Env,
+        info: MessageInfo,
+        pack_id: u64,
+        price: Uint128
+    ) -> Result<Response<C>, ContractError> {
+        let missing = ALLTOKENPACKS.may_load(deps.storage, &pack_id.clone().to_string())?;
+        if missing == None {
+            return Err(ContractError::NoPackableToken {});
+        }
+        let mut pack = ALLTOKENPACKS.load(deps.storage, &pack_id.clone().to_string())?;
+        if pack.current_owner != info.sender {
+            return Err(ContractError::Unauthorized {});
+        }
+        pack.current_price = price;
+        ALLTOKENPACKS.save(deps.storage, &pack_id.clone().to_string(), &pack)?;
+        Ok(Response::new()
+            .add_attribute("action", "set_token_pack_price")
+            .add_attribute("pack_id", pack_id.to_string())
+            .add_attribute("price", price.to_string())
+        )
+    }
+
+
+
 }
 
 impl<'a, T, C> Cw721Execute<T, C> for Cw721Contract<'a, T, C>
