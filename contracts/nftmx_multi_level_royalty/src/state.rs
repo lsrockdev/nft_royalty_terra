@@ -197,6 +197,7 @@ pub struct TokenPack {
     pub pack_id: u64,
     pub pack_name: String,
     pub token_address: Addr,
+    pub token_amount: Uint128,
     pub minted_by: Addr,
     pub current_owner: Addr,
     pub previous_owner: Option<Addr>,

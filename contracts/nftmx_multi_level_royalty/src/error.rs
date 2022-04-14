@@ -27,7 +27,7 @@ pub enum ContractError {
     #[error("already exist pack name")]
     ExistPackName {},
 
-    #[error("not nft owner")]
+    #[error("not nft pack owner")]
     NotNftOwner {},
 
     #[error("NFT pack balance is not enough")]
@@ -47,5 +47,14 @@ pub enum ContractError {
 
     #[error("Insufficient funds")]
     InsufficientFunds {},
+
+    #[error("Token pack balance is not enough")]
+    NoTokenBalance {},
+
+    #[error("not token pack owner")]
+    NotTokenPackOwner {},
+
+    #[error("not token pack royalty")]
+    NoTokenPackRoyalty {},
     
 }

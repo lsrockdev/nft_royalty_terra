@@ -1,7 +1,7 @@
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use cosmwasm_std::{Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Decimal, Uint128, CosmosMsg};
+use cosmwasm_std::{to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Decimal, Uint128, CosmosMsg, WasmMsg};
 
 use cw2::set_contract_version;
 use cw721::{ContractInfoResponse, CustomMsg, Cw721Execute, Cw721ReceiveMsg, Expiration};
@@ -440,6 +440,7 @@ where
             pack_id: pack_count,
             pack_name: pack_name.clone(),
             token_address: deps.api.addr_validate(&token_address.clone())?,
+            token_amount: amount,
             minted_by: info.sender.clone(),
             current_owner: info.sender.clone(),
             previous_owner: None,
@@ -482,9 +483,39 @@ where
         info: MessageInfo,
         pack_id: u64,
     ) -> Result<Response<C>, ContractError> {
+        let token_pack_balances = TOKENPACKBALANCES.load(deps.storage, &info.sender.to_string())?;
+        if token_pack_balances < 1u64 {
+            return Err(ContractError::NoTokenBalance {});
+        }
+        let token_pack = ALLTOKENPACKS.load(deps.storage, &pack_id.to_string())?;
+        if token_pack.current_owner != info.sender {
+            return Err(ContractError::NotTokenPackOwner {});
+        }
+        let empty = TOKENROYALTYFEES.may_load(deps.storage, (&pack_id.to_string(), &info.sender.clone().to_string()))?;
+        if empty == None {
+            return Err(ContractError::NoTokenPackRoyalty {});
+        }
 
+        //TODO check token balance in this address
+        let mut messages: Vec<CosmosMsg> = vec![];
+        let asset = Asset {
+            info: AssetInfo::Token {contract_addr: token_pack.token_address.clone().to_string()},
+            amount: token_pack.token_amount
+        };
+        messages.push(asset.into_msg(&deps.querier, info.sender.clone())?);
+        TOKENPACKNAMEEXISTS.update(deps.storage, &token_pack.pack_name, |_| -> StdResult<_> {
+            Ok(false)
+        })?;
+        TOKENPACKBALANCES.update(deps.storage, &info.sender.clone().to_string(), |old| -> StdResult<_> {
+            match old {
+                Some(v) => Ok(v - 1),
+                None => Ok(0u64),
+            }
+        })?;
+        ALLTOKENPACKS.remove(deps.storage, &pack_id.to_string());
         Ok(Response::new()
             .add_attribute("action", "unpack_tokens")
+            .add_attribute("pack_id", pack_id.to_string())
         )
     }
 }
