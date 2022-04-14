@@ -69,6 +69,9 @@ pub enum ExecuteMsg<T> {
     SetTokenPrice { token_id: String, price: Uint128 },
     SetNftPackPrice { pack_id: u64, price: Uint128 },
     SetTokenPackPrice { pack_id: u64, price: Uint128 },
+    SetTokenForSale { token_id: String, for_sale: bool },
+    SetNftPackForSale { pack_id: u64, for_sale: bool },
+    SetTokenPackForSale { pack_id: u64, for_sale: bool },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

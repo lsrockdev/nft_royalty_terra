@@ -80,7 +80,11 @@ where
             ExecuteMsg::SetBuyCellFee { fee } => self.set_buy_cell_fee(deps, env, info, fee),
             ExecuteMsg::SetTokenPrice { token_id, price } => self.set_token_price(deps, env, info, token_id, price),
             ExecuteMsg::SetNftPackPrice { pack_id, price } => self.set_nft_pack_price(deps, env, info, pack_id, price),
-            ExecuteMsg::SetTokenPackPrice { pack_id, price } => self.set_token_pack_price(deps, env, info, pack_id, price),        
+            ExecuteMsg::SetTokenPackPrice { pack_id, price } => self.set_token_pack_price(deps, env, info, pack_id, price),
+            
+            ExecuteMsg::SetTokenForSale { token_id, for_sale } => self.set_token_for_sale(deps, env, info, token_id, for_sale),
+            ExecuteMsg::SetNftPackForSale { pack_id, for_sale } => self.set_nft_pack_for_sale(deps, env, info, pack_id, for_sale),
+            ExecuteMsg::SetTokenPackForSale { pack_id, for_sale } => self.set_token_pack_for_sale(deps, env, info, pack_id, for_sale),
             ExecuteMsg::Approve {
                 spender,
                 token_id,
@@ -734,6 +738,80 @@ where
         )
     }
 
+    pub fn set_token_for_sale(
+        &self,
+        deps: DepsMut,
+        _env: Env,
+        info: MessageInfo,
+        token_id: String,
+        for_sale: bool
+    ) -> Result<Response<C>, ContractError> {
+        let missing = ALLPACKABLENFTS.may_load(deps.storage, &token_id.clone())?;
+        if missing == None {
+            return Err(ContractError::NoPackableToken {});
+        }
+        let mut token = ALLPACKABLENFTS.load(deps.storage, &token_id.clone())?;
+        if token.current_owner != info.sender {
+            return Err(ContractError::Unauthorized {});
+        }
+        token.for_sale = for_sale;
+        ALLPACKABLENFTS.save(deps.storage, &token_id.clone(), &token)?;
+        Ok(Response::new()
+            .add_attribute("action", "set_token_for_sale")
+            .add_attribute("token_id", token_id)
+            .add_attribute("for_sale", for_sale.to_string())
+        )
+    }
+
+    pub fn set_nft_pack_for_sale(
+        &self,
+        deps: DepsMut,
+        _env: Env,
+        info: MessageInfo,
+        pack_id: u64,
+        for_sale: bool
+    ) -> Result<Response<C>, ContractError> {
+        let missing = ALLNFTPACKS.may_load(deps.storage, &pack_id.clone().to_string())?;
+        if missing == None {
+            return Err(ContractError::NoPackableToken {});
+        }
+        let mut pack = ALLNFTPACKS.load(deps.storage, &pack_id.clone().to_string())?;
+        if pack.current_owner != info.sender {
+            return Err(ContractError::Unauthorized {});
+        }
+        pack.for_sale = for_sale;
+        ALLNFTPACKS.save(deps.storage, &pack_id.clone().to_string(), &pack)?;
+        Ok(Response::new()
+            .add_attribute("action", "set_nft_pack_for_sale")
+            .add_attribute("pack_id", pack_id.to_string())
+            .add_attribute("for_sale", for_sale.to_string())
+        )
+    }
+
+    pub fn set_token_pack_for_sale(
+        &self,
+        deps: DepsMut,
+        _env: Env,
+        info: MessageInfo,
+        pack_id: u64,
+        for_sale: bool
+    ) -> Result<Response<C>, ContractError> {
+        let missing = ALLTOKENPACKS.may_load(deps.storage, &pack_id.clone().to_string())?;
+        if missing == None {
+            return Err(ContractError::NoPackableToken {});
+        }
+        let mut pack = ALLTOKENPACKS.load(deps.storage, &pack_id.clone().to_string())?;
+        if pack.current_owner != info.sender {
+            return Err(ContractError::Unauthorized {});
+        }
+        pack.for_sale = for_sale;
+        ALLTOKENPACKS.save(deps.storage, &pack_id.clone().to_string(), &pack)?;
+        Ok(Response::new()
+            .add_attribute("action", "set_token_pack_for_sale")
+            .add_attribute("pack_id", pack_id.to_string())
+            .add_attribute("for_sale", for_sale.to_string())
+        )
+    }
 
 
 }
