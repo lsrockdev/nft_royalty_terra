@@ -75,6 +75,7 @@ where
                 => self.pack_tokens(deps, env, info, pack_name, token_address, amount, price, royalty_fee),
             ExecuteMsg::UnpackTokens { pack_id } => self.unpack_tokens(deps, env, info, pack_id),
             ExecuteMsg::ApproveTokenPack { pack_id, to } => self.approve_token_pack(deps, env, info, pack_id, to),
+            ExecuteMsg::TransferTokenPack { pack_id, from, to } => self.transfer_token_pack(deps, env, info, pack_id, from, to),
             ExecuteMsg::Approve {
                 spender,
                 token_id,
@@ -545,6 +546,47 @@ where
         )
     }
 
+    pub fn transfer_token_pack(
+        &self,
+        deps: DepsMut,
+        env: Env,
+        _info: MessageInfo,
+        pack_id: u64,
+        from: String,
+        to: String
+    ) -> Result<Response<C>, ContractError> {
+        let mut token_pack = ALLTOKENPACKS.load(deps.storage, &pack_id.to_string())?;
+        if token_pack.current_owner.to_string() != from {
+            return Err(ContractError::NotTokenPackOwner {});
+        }
+        if token_pack.approvals.len() == 0 || token_pack.approvals.iter().find(|&x| *x == env.contract.address.clone()) == None {
+            return Err(ContractError::NotTokenApproved {});
+        }
+        token_pack.previous_owner = Some(token_pack.current_owner.clone());
+        token_pack.current_owner = deps.api.addr_validate(&to)?;
+        token_pack.previous_price = token_pack.current_price.clone();
+        token_pack.number_of_transfers = token_pack.number_of_transfers + 1;
+        TOKENPACKBALANCES.update(deps.storage, &from.clone(), |old| -> StdResult<_> {
+            match old {
+                Some(v) => Ok(v - 1),
+                None => Ok(0u64),
+            }
+        })?;
+        TOKENPACKBALANCES.update(deps.storage, &to.clone(), |old| -> StdResult<_> {
+            match old {
+                Some(v) => Ok(v + 1),
+                None => Ok(0u64),
+            }
+        })?;
+        token_pack.approvals = vec![];
+        ALLTOKENPACKS.save(deps.storage, &pack_id.to_string(), &token_pack)?;
+        Ok(Response::new()
+            .add_attribute("action", "transfer_token_pack")
+            .add_attribute("pack_id", pack_id.to_string())
+            .add_attribute("from", from)
+            .add_attribute("to", to)
+        )
+    }
 }
 
 impl<'a, T, C> Cw721Execute<T, C> for Cw721Contract<'a, T, C>

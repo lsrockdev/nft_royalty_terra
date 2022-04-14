@@ -63,6 +63,7 @@ pub enum ExecuteMsg<T> {
     PackTokens { pack_name: String, token_address: String, amount: Uint128, price: Uint128, royalty_fee: Decimal },
     UnpackTokens { pack_id: u64 },
     ApproveTokenPack { pack_id: u64, to: String },
+    TransferTokenPack { pack_id: u64, from: String, to: String }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

@@ -56,5 +56,8 @@ pub enum ContractError {
 
     #[error("not token pack royalty")]
     NoTokenPackRoyalty {},
-    
+
+    #[error("Not approved Token pack")]
+    NotTokenApproved {},
+
 }
