@@ -206,6 +206,7 @@ pub struct TokenPack {
     pub number_of_transfers: u64,
     pub for_sale: bool,
     pub royalty_owners: Vec<Addr>,
+    pub approvals: Vec<Addr>
 }
 
 pub const ALLTOKENPACKS: Map<&str, TokenPack> = Map::new("all_token_packs");

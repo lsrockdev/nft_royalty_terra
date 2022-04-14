@@ -74,6 +74,7 @@ where
             ExecuteMsg::PackTokens { pack_name, token_address, amount, price, royalty_fee }
                 => self.pack_tokens(deps, env, info, pack_name, token_address, amount, price, royalty_fee),
             ExecuteMsg::UnpackTokens { pack_id } => self.unpack_tokens(deps, env, info, pack_id),
+            ExecuteMsg::ApproveTokenPack { pack_id, to } => self.approve_token_pack(deps, env, info, pack_id, to),
             ExecuteMsg::Approve {
                 spender,
                 token_id,
@@ -452,6 +453,7 @@ where
             number_of_transfers: 0u64,
             for_sale: true,
             royalty_owners: vec![info.sender.clone()],
+            approvals: vec![],
         };
         
         // update all TokenPack
@@ -521,6 +523,28 @@ where
             .add_attribute("pack_id", pack_id.to_string())
         )
     }
+
+    pub fn approve_token_pack(
+        &self,
+        deps: DepsMut,
+        _env: Env,
+        info: MessageInfo,
+        pack_id: u64,
+        to: String
+    ) -> Result<Response<C>, ContractError> {
+        let mut token_pack = ALLTOKENPACKS.load(deps.storage, &pack_id.to_string())?;
+        if token_pack.current_owner != info.sender {
+            return Err(ContractError::NotTokenPackOwner {});
+        }
+        token_pack.approvals.push(deps.api.addr_validate(&to)?);
+        ALLTOKENPACKS.save(deps.storage, &pack_id.to_string(), &token_pack)?;
+        Ok(Response::new()
+            .add_attribute("action", "approve_token_pack")
+            .add_attribute("pack_id", pack_id.to_string())
+            .add_attribute("to", to)
+        )
+    }
+
 }
 
 impl<'a, T, C> Cw721Execute<T, C> for Cw721Contract<'a, T, C>
